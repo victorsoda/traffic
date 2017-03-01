@@ -1,0 +1,14 @@
+#include <iostream>
+using namespace std;
+
+
+
+int main(int argc,char **argv)
+{
+	cout << argv[2] << endl;
+	if(argv[2] == "hello")
+		cout << "hi!" << endl;
+	
+	
+	return 0;
+}

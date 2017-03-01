@@ -1,0 +1,3 @@
+g++ -c Rib.cpp -o Rib.o
+g++ -c main.cpp -o main.o
+g++ Rib.o main.o -lpthread -o run

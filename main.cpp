@@ -14,7 +14,7 @@
 #include <unistd.h>
 #define IP_LEN		32
 #define FIFONUM		5
-#define MAXIPNUM	10000000
+#define MAXIPNUM	5000000
 using namespace std;
 
 struct cache{
@@ -175,7 +175,8 @@ void* mythread(void* arg)
 				hitcnt[threadnum]++;
 			} 
 			else {
-				int _nexthop = detectForFullIp(nextip);
+				//int _nexthop = detectForFullIp(nextip);
+				int _nexthop = 12345;
 				nexthop_toprint = _nexthop;
 				compare[threadnum].ip = nextip;
 				compare[threadnum].nexthop = _nexthop;

@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <errno.h>
 #define IP_LEN		32
 #define FIFONUM		5
 #define MAXIPNUM	5000000
@@ -33,6 +34,7 @@ int fifoIPcnt[FIFONUM + 2];
 bool finished_distribution = false;
 timeval tv1,tv2;	//for timer
 unsigned long tv;	//for timer
+pthread_mutex_t thread_mutex;
 
 
 //given the root of rib trie---m_trie and the prefix---insert_C, return nexthop
@@ -133,9 +135,14 @@ int detectForFullIp(string ip)
 {
 	char new_tmp[IP_LEN+1];
 	memset(new_tmp, 0, sizeof(new_tmp));
-	
-	tRib.IpToBinary(ip, new_tmp);
-	int hop = FindNextHop(tRib.m_pTrie,new_tmp);
+		
+
+	int hop = 11111;
+	if(new_tmp != NULL) {
+		tRib.IpToBinary(ip, new_tmp);
+		hop = FindNextHop(tRib.m_pTrie,new_tmp);
+	}
+	else cout << "null" << endl;	
 	return hop;
 }
 
@@ -164,27 +171,35 @@ void* mythread(void* arg)
 	*/	
 	
 	//cout << threadnum << endl;	
+	
+	
+	int ret;
 
 	while(true) {
-		if(!fifo[threadnum].empty()) {
-			string nextip = fifo[threadnum].front();
-			fifoIPcnt[threadnum]++;
-			int nexthop_toprint = -1;
-			if(nextip == compare[threadnum].ip) {
-				nexthop_toprint = compare[threadnum].nexthop;
-				hitcnt[threadnum]++;
-			} 
-			else {
-				//int _nexthop = detectForFullIp(nextip);
-				int _nexthop = 12345;
-				nexthop_toprint = _nexthop;
-				compare[threadnum].ip = nextip;
-				compare[threadnum].nexthop = _nexthop;
+		pthread_mutex_lock(&thread_mutex);
+		//ret = pthread_mutex_trylock(&thread_mutex);		
+		//if(ret!=EBUSY) {		
+			if(!fifo[threadnum].empty()) {
+				string nextip = fifo[threadnum].front();
+				fifoIPcnt[threadnum]++;
+				int nexthop_toprint = -1;
+				if(nextip == compare[threadnum].ip) {
+					nexthop_toprint = compare[threadnum].nexthop;
+					hitcnt[threadnum]++;
+				} 
+				else {
+					int _nexthop = detectForFullIp(nextip);
+					//int _nexthop = 12345;
+					nexthop_toprint = _nexthop;
+					compare[threadnum].ip = nextip;
+					compare[threadnum].nexthop = _nexthop;
+				}
+				fifo[threadnum].pop();
+				//fout << nextip << " " << nexthop_toprint << endl;
 			}
-			fifo[threadnum].pop();
-			//fout << nextip << " " << nexthop_toprint << endl;
-		}
-		if(fifo[threadnum].empty() && finished_distribution) break;
+			pthread_mutex_unlock(&thread_mutex);
+			if(finished_distribution && fifo[threadnum].empty()) break;
+		//}
 	}
 	//fout.close();
 }
@@ -193,7 +208,7 @@ void* mythread(void* arg)
 int main(int argc, char **argv)
 {
 	init();
-		
+	pthread_mutex_init(&thread_mutex, NULL);
 	
 	for(int i = 0; i < FIFONUM; ++i) {
 		j[i] = i;
@@ -203,6 +218,7 @@ int main(int argc, char **argv)
 			return 0;
 		}
 	}
+	
 	
 	//readin all the IPs to be looked up later
 	string filenamestr = "DIP.txt";
@@ -222,11 +238,18 @@ int main(int argc, char **argv)
 	cout << "start looking up while distributing..." << endl;
 	gettimeofday(&tv1,NULL);
 	
+	int ret;
 	for(int l = 0; l < ipcnt; l++) {
-		int hash = DJBHash(ipstr[l]);
-		distribute(hash, ipstr[l]);
+		pthread_mutex_lock(&thread_mutex);
+		//int ret = pthread_mutex_trylock(&thread_mutex);		
+		//if(ret!=EBUSY) {
+			int hash = DJBHash(ipstr[l]);
+			distribute(hash, ipstr[l]);
+			pthread_mutex_unlock(&thread_mutex);
+		//}
 	}
 	finished_distribution = true;
+
 	cout << "waiting for all threads over..." << endl;
 	for(int i = 0; i < FIFONUM; ++i) {
 		pthread_join(thread[i], NULL);

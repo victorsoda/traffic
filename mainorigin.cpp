@@ -15,7 +15,7 @@
 #include <errno.h>
 #define IP_LEN		32
 #define FIFONUM		5
-#define MAXIPNUM	3000000
+#define MAXIPNUM	5000000
 using namespace std;
 
 struct cache{
@@ -173,10 +173,9 @@ void* mythread(void* arg)
 	
 	//cout << threadnum << endl;	
 	
-	int ret;
+
 	while(true) {
-		ret = pthread_mutex_trylock(&thread_mutex);	
-		if(ret != EBUSY) {		
+		pthread_mutex_lock(&thread_mutex);		
 		if(!fifo[threadnum].empty()) {
 			string nextip = fifo[threadnum].front();
 			fifoIPcnt[threadnum]++;
@@ -196,7 +195,6 @@ void* mythread(void* arg)
 		}
 		pthread_mutex_unlock(&thread_mutex);
 		if(finished_distribution && fifo[threadnum].empty()) break;
-		}
 	}
 	//fout.close();
 }
@@ -212,21 +210,6 @@ int main(int argc, char **argv)
 	init();
 	
 
-	
-	//readin all the IPs to be looked up later.
-	string filenamestr = "DIP.txt";
-	char filename[30];
-	strcpy(filename, filenamestr.c_str());
-	ifstream fin(filename);
-	string theTime; //timestamp
-	cout << "read in from DIP file..." << endl;
-	int ipcnt = 0;
-	while(fin >> theTime) {
-		fin >> ipstr[ipcnt];
-		ipcnt++;
-	}
-	cout << "ipcnt = " << ipcnt << endl;
-	
 	bool optimizeStrategy = (argc == 1) || (argc == 2 && !strcmp(argv[1], array[1]));
 	if (optimizeStrategy) {
 		pthread_mutex_init(&thread_mutex, NULL);
@@ -242,6 +225,21 @@ int main(int argc, char **argv)
 		}
 	}
 	
+	//readin all the IPs to be looked up later.
+	string filenamestr = "DIP.txt";
+	char filename[30];
+	strcpy(filename, filenamestr.c_str());
+	ifstream fin(filename);
+	string theTime; //timestamp
+	cout << "read in from DIP file..." << endl;
+	int ipcnt = 0;
+	while(fin >> theTime) {
+		fin >> ipstr[ipcnt];
+		ipcnt++;
+	}
+	cout << "ipcnt = " << ipcnt << endl;
+	
+	
 	//start timer.
 	cout << "start looking up while distributing..." << endl;
 	gettimeofday(&tv1,NULL);
@@ -250,12 +248,9 @@ int main(int argc, char **argv)
 	if(optimizeStrategy) {	
 		for(int l = 0; l < ipcnt; l++) {
 			pthread_mutex_lock(&thread_mutex);
-			//int ret = pthread_mutex_trylock(&thread_mutex);
-			//if(ret!=EBUSY) {
 			int hash = DJBHash(ipstr[l]);
 			distribute(hash, ipstr[l]);
 			pthread_mutex_unlock(&thread_mutex);
-			//}
 		}
 		finished_distribution = true;
 		
